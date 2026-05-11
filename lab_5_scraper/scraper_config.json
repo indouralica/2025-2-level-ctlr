@@ -1,8 +1,8 @@
 {
-    "seed_urls": ["https://samlib.ru/"],
+    "seed_urls": ["https://samlib.ru/type/", "https://samlib.ru/a/", "https://samlib.ru/b/", "https://samlib.ru/w/"],
     "headers": {"user-agent": "Mozilla/5.0"},
-    "total_articles_to_find_and_parse": 2,
-    "encoding": "utf-8",
+    "total_articles_to_find_and_parse": 10,
+    "encoding": "windows-1251",
     "timeout": 30,
     "should_verify_certificate": true,
     "headless_mode": false
