@@ -333,9 +333,6 @@ class HTMLParser:
         if dd_tags:
             for dd in dd_tags:
                 text_content += dd.get_text(strip=True) + '\n'
-            
-        if not text_content.strip():
-            text_content = article_soup.get_text(strip=True)
 
         self.article.text = text_content.strip()
 
