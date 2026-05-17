@@ -432,7 +432,5 @@ def main() -> None:
             to_raw(article)
             to_meta(article)
 
-
 if __name__ == "__main__":
     main()
-    
