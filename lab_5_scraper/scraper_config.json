@@ -1,7 +1,7 @@
 {
-    "seed_urls": ["https://samlib.ru/a/", "https://samlib.ru/b/", "https://samlib.ru/w/"],
+    "seed_urls": ["https://samlib.ru/long.shtml", "https://samlib.ru/a/"],
     "headers": {"user-agent": "Mozilla/5.0"},
-    "total_articles_to_find_and_parse": 5,
+    "total_articles_to_find_and_parse": 8,
     "encoding": "windows-1251",
     "timeout": 30,
     "should_verify_certificate": true,

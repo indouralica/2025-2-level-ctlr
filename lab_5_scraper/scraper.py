@@ -9,12 +9,13 @@ import shutil
 from typing import Union
 
 import requests
+from requests.exceptions import RequestException
 from bs4 import BeautifulSoup
 
 from core_utils.article.article import Article
+from core_utils.article.io import to_raw, to_meta
 from core_utils.config_dto import ConfigDTO
-from core_utils.constants import CRAWLER_CONFIG_PATH, ASSETS_PATH
-from core_utils.article.io import to_raw
+from core_utils.constants import ASSETS_PATH, CRAWLER_CONFIG_PATH
 
 
 class IncorrectSeedURLError(Exception):
@@ -230,7 +231,7 @@ class Crawler:
         self.config = config
         self.urls: list[str] = []
 
-    def _extract_url(self, article_bs: BeautifulSoup) -> list[str]:
+    def _extract_url(self, article_bs: BeautifulSoup) -> str:
         """
         Find and retrieve url from HTML.
 
@@ -240,33 +241,16 @@ class Crawler:
         Returns:
             list[str]: List of urls from HTML
         """
-        urls = []
-        links = article_bs.find_all('a', href=True)
-
-        article_patterns = [
-            r'.*\.shtml$',
-            r'/editors/.*',
-            r'/[a-z]/[a-z0-9_-]+/.*',
-         ]
-        
-        for link in links:
-            href = link.get('href')
-            if href:
-                is_article = False
-                for pattern in article_patterns:
-                    if re.match(pattern, href, re.IGNORECASE):
-                        is_article = True
-                        break
-            
-                if is_article:
-                    if href.startswith('/'):
-                        full_url = f"https://samlib.ru{href}"
-                    elif not href.startswith('http'):
-                        full_url = f"https://samlib.ru/{href}"
-                    else:
-                        full_url = href
-                    urls.append(full_url)
-        return urls
+        href = article_bs.get('href')
+    
+        if href.startswith('/'):
+            full_url = f"https://samlib.ru{href}"
+        elif not href.startswith('http'):
+            full_url = f"https://samlib.ru/{href}"
+        else:
+            full_url = href
+    
+        return full_url
 
     def find_articles(self) -> None:
         """
@@ -282,13 +266,17 @@ class Crawler:
             try:
                 response = make_request(seed_url, self.config)
                 if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    extracted_urls = self._extract_url(soup)
+                    soup = BeautifulSoup(response.text, 'lxml')
 
-                    for url in extracted_urls:
-                        if url not in self.urls and len(self.urls) < num_articles_needed:
-                            self.urls.append(url)
-            except Exception:
+                    links = soup.find_all('a', href=True)
+                    for link in links:
+                        href = link.get('href')
+                        if href and href.endswith('.shtml'):
+                            full_url = self._extract_url(link)
+                            if full_url not in self.urls and len(self.urls) < num_articles_needed:
+                                self.urls.append(full_url)
+
+            except RequestException:
                 continue
 
     def get_search_urls(self) -> list:
@@ -299,6 +287,29 @@ class Crawler:
             list: seed_urls param
         """
         return self.config.get_seed_urls()
+
+# 10
+
+
+class CrawlerRecursive(Crawler):
+    """
+    Recursive implementation.
+
+    Get one URL of the title page and find requested number of articles recursively.
+    """
+
+    def __init__(self, config: Config) -> None:
+        """
+        Initialize an instance of the CrawlerRecursive class.
+
+        Args:
+            config (Config): Configuration
+        """
+
+    def find_articles(self) -> None:
+        """
+        Find number of article urls requested.
+        """
 
 
 class HTMLParser:
@@ -329,12 +340,41 @@ class HTMLParser:
         """
         text_content = ''
         dd_tags = article_soup.find_all('dd') # кажется, что на этом сайте все тексты находятся в dd тегах
+        pre_tags = article_soup.find_all('pre')
 
         if dd_tags:
             for dd in dd_tags:
                 text_content += dd.get_text(strip=True) + '\n'
-
+        
+        if not text_content.strip():
+            if pre_tags:
+                for pre in pre_tags:
+                    text_content += pre.get_text(strip=True) + '\n'
+        
+        if not text_content.strip():
+            text_content = article_soup.get_text(separator='\n', strip=True)
+                    
         self.article.text = text_content.strip()
+
+    def _fill_article_with_meta_information(self, article_soup: BeautifulSoup) -> None:
+        """
+        Find meta information of article.
+
+        Args:
+            article_soup (bs4.BeautifulSoup): BeautifulSoup instance
+        """
+
+        title_tag = article_soup.find('title')
+
+        if title_tag:
+            full_title = title_tag.get_text(strip=True)
+            if '. ' in full_title:
+                parts = full_title.split('. ', 1)  
+                self.article.author = [parts[0]]
+                self.article.title = parts[1]       
+            else:
+                self.article.title = full_title
+                self.article.author = ['NOT FOUND']
 
     def parse(self) -> Union[Article, bool]:
         """
@@ -348,8 +388,9 @@ class HTMLParser:
             if response.status_code != 200:
                 return False
 
-            article_soup = BeautifulSoup(response.text, 'html.parser')
+            article_soup = BeautifulSoup(response.text, 'lxml')
             self._fill_article_with_text(article_soup)
+            self._fill_article_with_meta_information(article_soup)
             
             return self.article
         except Exception:
@@ -389,6 +430,7 @@ def main() -> None:
 
         if article:
             to_raw(article)
+            to_meta(article)
 
 
 if __name__ == "__main__":
