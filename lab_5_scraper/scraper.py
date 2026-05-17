@@ -8,8 +8,8 @@ import re
 import shutil
 from typing import Union
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
 
 from core_utils.article.article import Article
@@ -435,3 +435,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
