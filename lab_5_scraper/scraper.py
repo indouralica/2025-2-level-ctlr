@@ -275,10 +275,12 @@ class Crawler:
                     links = soup.find_all('a', href=True)
                     for link in links:
                         href = link.get('href')
-                        if href and href.endswith('.shtml'):
-                            full_url = self._extract_url(link)
-                            if full_url not in self.urls and len(self.urls) < num_articles_needed:
-                                self.urls.append(full_url)
+                        if href:
+                            if (href.endswith('.shtml') and 'indexdate' not in href and 'indexvote' not in href):
+                                if re.match(r'.*/[a-z]/[a-z0-9_-]+/[a-z0-9_-]+\.shtml$', href, re.IGNORECASE):
+                                    full_url = self._extract_url(link)
+                                    if (full_url not in self.urls and full_url not in seed_urls and len(self.urls) < num_articles_needed):
+                                        self.urls.append(full_url)
 
             except RequestException:
                 continue
@@ -343,20 +345,29 @@ class HTMLParser:
             article_soup (bs4.BeautifulSoup): BeautifulSoup instance
         """
         text_content = ''
-        dd_tags = article_soup.find_all('dd') # кажется, что на этом сайте все тексты находятся в dd тегах
         pre_tags = article_soup.find_all('pre')
-
-        if dd_tags:
-            for dd in dd_tags:
-                dd_text = dd.get_text(separator='\n', strip=True)
-                if len(dd_text) > 200:
-                    text_content += dd_text + '\n'
-                    break
+        br_tags = article_soup.find_all('br')
+        hr_tag = article_soup.find('hr', attrs={'size': True})
         
+        if hr_tag:
+            dd_tags = hr_tag.find_all_next('dd')
+            for dd in dd_tags:
+                dd_text = dd.get_text(strip = True)
+                if dd_text:
+                    text_content += dd_text + '\n'
+                break
+            
+        if not text_content.strip():
+            if br_tags:
+                for br in br_tags:
+                    text_content += br.get_text(strip=True) + '\n'
+                    break
+
         if not text_content.strip():
             if pre_tags:
                 for pre in pre_tags:
                     text_content += pre.get_text(strip=True) + '\n'
+                    break
         
         if not text_content.strip():
             text_content = article_soup.get_text(separator='\n', strip=True)

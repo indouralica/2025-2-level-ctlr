@@ -4,9 +4,12 @@ Pipeline for CONLL-U formatting.
 
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks, duplicate-code
 import pathlib
+import re
 
-from core_utils.article.article import Article
+from core_utils.article.article import Article, ArtifactType
 from core_utils.pipeline import LibraryWrapper, PipelineProtocol, TreeNode
+from core_utils.constants import ASSETS_PATH, PROJECT_ROOT
+from core_utils.article.io import to_cleaned
 
 try:
     from networkx import DiGraph
@@ -23,6 +26,14 @@ except ImportError:
     Doc = None  # type: ignore
     print("No libraries installed. Failed to import.")
 
+class EmptyDirectoryError(Exception):
+    "Exception raised when directory is empty"
+
+class InconsistentDatasetError(Exception):
+    "Exception raised when IDs contain slips, number of meta and raw files is not equal, files are empty"
+
+class EmptyFileError(Exception):
+    "Exception raised when article is empty"
 
 class CorpusManager:
     """
@@ -36,16 +47,62 @@ class CorpusManager:
         Args:
             path_to_raw_txt_data (pathlib.Path): Path to raw txt data
         """
+        self.path_to_raw_txt_data = path_to_raw_txt_data
+        self._storage = {}
+        self._validate_dataset()
+        self._scan_dataset()
 
     def _validate_dataset(self) -> None:
         """
         Validate folder with assets.
         """
+        if not self.path_to_raw_txt_data.exists():
+            raise FileNotFoundError
+        
+        if not self.path_to_raw_txt_data.is_dir():
+            raise NotADirectoryError
+        
+        files = list(self.path_to_raw_txt_data.glob("*_raw.txt")) # проверка на то, пуста ли директория
+        if not files:
+            raise EmptyDirectoryError
+        
+        id_set = set()
+        for file in files:
+            try:
+                article_id = int(file.stem.split("_")[0])
+                id_set.add(article_id)
+            except (ValueError, IndexError):
+                continue
+        
+        required_ids = set(range(1, len(id_set) + 1))
+        if id_set != required_ids:
+            raise InconsistentDatasetError
+        
+        for article_id in id_set: # перебираем все id статей; формируем пути к файлам
+            raw = self.path_to_raw_txt_data / f'{article_id}_raw.txt' 
+            meta = self.path_to_raw_txt_data / f'{article_id}_meta.json'
 
+            if not meta.exists():
+                raise InconsistentDatasetError
+            if raw.stat().st_size == 0 or meta.stat().st_size == 0: # проверка, не пустые ли
+                raise InconsistentDatasetError
+        
+        
+        
     def _scan_dataset(self) -> None:
         """
         Register each dataset entry.
         """
+        files = self.path_to_raw_txt_data.glob("*_raw.txt")
+        for file in files:
+            article_id = int(file.stem.split("_")[0])
+            article = Article(url=None, article_id=article_id) #создаём объект Article для каждого raw файла
+            with open(file, 'r', encoding = 'utf-8') as f:
+                raw_text = f.read()
+            article.text = raw_text
+            self._storage[article_id] = article # добавление в словарь
+
+
 
     def get_articles(self) -> dict:
         """
@@ -54,7 +111,7 @@ class CorpusManager:
         Returns:
             dict: Storage params
         """
-
+        return self._storage
 
 class TextProcessingPipeline(PipelineProtocol):
     """
@@ -71,12 +128,21 @@ class TextProcessingPipeline(PipelineProtocol):
             corpus_manager (CorpusManager): CorpusManager instance
             analyzer (LibraryWrapper | None, optional): Analyzer instance. Defaults to None.
         """
+        self._corpus = corpus_manager
+        self._analyzer = analyzer
 
     def run(self) -> None:
         """
         Perform basic preprocessing and write processed text to files.
         """
-
+        articles = self._corpus.get_articles()
+        for article in articles.values():
+            raw_text = article.text
+            #чистим и сохраняем текст
+            final_text = raw_text.lower()
+            final_text = re.sub(r"[^\w\s\'-]", "", final_text)
+            article.cleaned_text = final_text
+            to_cleaned(article)
 
 class UDPipeAnalyzer(LibraryWrapper):
     """
@@ -223,6 +289,10 @@ def main() -> None:
     """
     Entrypoint for pipeline module.
     """
+    corpus_manager = CorpusManager(PROJECT_ROOT / "tmp" / "articles")
+    pipeline = TextProcessingPipeline(corpus_manager)
+    pipeline.run()
+
 
 
 if __name__ == "__main__":
