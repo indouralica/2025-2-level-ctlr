@@ -7,9 +7,9 @@ import pathlib
 import re
 
 from core_utils.article.article import Article, ArtifactType
-from core_utils.pipeline import LibraryWrapper, PipelineProtocol, TreeNode
-from core_utils.constants import ASSETS_PATH, PROJECT_ROOT
 from core_utils.article.io import to_cleaned
+from core_utils.constants import ASSETS_PATH, PROJECT_ROOT
+from core_utils.pipeline import LibraryWrapper, PipelineProtocol, TreeNode
 
 try:
     from networkx import DiGraph

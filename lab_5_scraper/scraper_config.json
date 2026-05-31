@@ -1,5 +1,5 @@
 {
-    "seed_urls": ["https://samlib.ru/rating/top40/"],
+    "seed_urls": ["https://samlib.ru/rating/comment/index_comment.shtml"],
     "headers": {"user-agent": "Mozilla/5.0"},
     "total_articles_to_find_and_parse": 10,
     "encoding": "windows-1251",
