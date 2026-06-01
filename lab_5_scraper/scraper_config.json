@@ -1,9 +1,9 @@
 {
-    "seed_urls": ["https://samlib.ru/rating/comment/index_comment.shtml"],
-    "headers": {"user-agent": "Mozilla/5.0"},
-    "total_articles_to_find_and_parse": 10,
+    "seed_urls": ["https://samlib.ru/long.shtml"],
+    "headers": {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.4.0.0 Safari/537.36"},
+    "total_articles_to_find_and_parse": 5,
     "encoding": "windows-1251",
-    "timeout": 30,
+    "timeout": 50,
     "should_verify_certificate": true,
     "headless_mode": false
 }
